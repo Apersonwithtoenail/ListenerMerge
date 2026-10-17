@@ -4,3 +4,11 @@ __pycache__/
 *.pyc
 .lsm_state.json
 .env
+
+# Yuma Injector files
+*.backup
+yuma_extracted/
+yuma_injected/
+yuma_temp/
+check_db/
+check_export/
