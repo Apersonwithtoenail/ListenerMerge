@@ -1,4 +1,4 @@
-import os, io, glob, json, zipfile
+import os, io, glob, json, zipfile, sqlite3, tempfile
 import requests, time
 from dateutil import parser as dp
 from bs4 import BeautifulSoup
@@ -66,10 +66,8 @@ def parse_pxpl(path):
     out = []
     for it in items:
         ts = it.get("timestamp", 0)
-        if ts > 9999999999:
-            ts //= 1000
-        if not ts or not it.get("title"):
-            continue
+        if ts > 9999999999: ts //= 1000
+        if not ts or not it.get("title"): continue
         out.append({
             "listened_at": int(ts),
             "track_metadata": {
@@ -77,6 +75,52 @@ def parse_pxpl(path):
                 "track_name": it["title"]
             }
         })
+    return out
+
+def parse_yuma(backup_path):
+    out = []
+    if not backup_path or not os.path.exists(backup_path):
+        return out
+        
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with zipfile.ZipFile(backup_path, 'r') as z:
+            z.extractall(tmpdir)
+        
+        db_path = os.path.join(tmpdir, "song.db")
+        if not os.path.exists(db_path):
+            print("❌ Yuma song.db not found inside backup.")
+            return out
+            
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Join event -> song -> artist
+        query = """
+            SELECT 
+                e.timestamp, 
+                s.title,
+                (SELECT a.name FROM artist a JOIN song_artist_map sam ON a.id = sam.artistId WHERE sam.songId = s.id LIMIT 1) as artist_name
+            FROM event e
+            JOIN song s ON e.songId = s.id
+        """
+        try:
+            cursor.execute(query)
+            for row in cursor.fetchall():
+                ts = row[0]
+                if ts > 9999999999: ts //= 1000
+                track = row[1]
+                artist = row[2] or "Unknown Artist"
+                if ts and track:
+                    out.append({
+                        "listened_at": int(ts),
+                        "track_metadata": {
+                            "artist_name": artist,
+                            "track_name": track
+                        }
+                    })
+        except sqlite3.OperationalError as e:
+            print(f"⚠️ Yuma SQLite error: {e}")
+        conn.close()
     return out
 
 def push(listens):
@@ -102,7 +146,7 @@ def push(listens):
             return
         time.sleep(1)
 
-def run(spotify_dir, takeout_dir, pxpl):
+def run(spotify_dir, takeout_dir, pxpl, yuma):
     print("🎵 Merging local sources...")
     all_l = []
     if os.path.isdir(spotify_dir):
@@ -117,6 +161,11 @@ def run(spotify_dir, takeout_dir, pxpl):
         p = parse_pxpl(pxpl)
         print(f"   PixelMusic: {len(p)}")
         all_l += p
+    if yuma and os.path.exists(yuma):
+        ym = parse_yuma(yuma)
+        print(f"   Yuma: {len(ym)}")
+        all_l += ym
+        
     print(f"📊 total: {len(all_l)}")
     push(all_l)
     print("✅ merge done")

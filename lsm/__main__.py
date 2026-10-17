@@ -10,10 +10,11 @@ def main():
 
     sub.add_parser("sync", help="Sync new Last.fm scrobbles → ListenBrainz")
 
-    pm = sub.add_parser("merge", help="Merge local Spotify / YTMusic / PixelMusic backups")
+    pm = sub.add_parser("merge", help="Merge local Spotify / YTMusic / PixelMusic / Yuma backups")
     pm.add_argument("--spotify", default="Spotify Extended Streaming History")
     pm.add_argument("--takeout", default="Takeout")
     pm.add_argument("--pxpl", default=None)
+    pm.add_argument("--yuma", default=None, help="Path to Yuma_*.backup file")
 
     sub.add_parser("stats", help="Show last sync timestamp")
 
@@ -26,7 +27,7 @@ def main():
         sync_lastfm.run()
     elif args.cmd == "merge":
         from . import merge
-        merge.run(args.spotify, args.takeout, args.pxpl)
+        merge.run(args.spotify, args.takeout, args.pxpl, args.yuma)
     elif args.cmd == "stats":
         from . import stats
         stats.run()
