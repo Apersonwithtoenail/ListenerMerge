@@ -12,3 +12,8 @@ yuma_injected/
 yuma_temp/
 check_db/
 check_export/
+Spotify Extended Streaming History/
+Spotify Extended Streaming History (1)/
+Takeout/
+YumaPlayer/
+*.py
